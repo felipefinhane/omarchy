@@ -25,11 +25,23 @@ if [[ -z $device ]]; then
   exit 1
 fi
 
+# The level to bring back after the lock screen blanks the keyboard. Restore
+# consumes it, so a later wake that never blanked (screensaver dismissed, lock
+# that never reached the blank) leaves whatever level the user set since alone,
+# and a second blank before a wake keeps the level saved by the first instead
+# of saving the already-dark 0.
+state_file="${XDG_RUNTIME_DIR:-/tmp}/omarchy-brightness-keyboard-restore"
+
 if [[ $direction == "off" ]]; then
-  brightnessctl -sd "$device" set 0 >/dev/null
+  [[ -f $state_file ]] || brightnessctl -d "$device" get >"$state_file"
+  brightnessctl -d "$device" set 0 >/dev/null
   exit 0
 elif [[ $direction == "restore" ]]; then
-  brightnessctl -rd "$device" >/dev/null
+  if [[ -f $state_file ]]; then
+    saved_brightness="$(<"$state_file")"
+    rm -f "$state_file"
+    [[ $saved_brightness =~ ^[0-9]+$ ]] && brightnessctl -d "$device" set "$saved_brightness" >/dev/null
+  fi
   exit 0
 fi
 
