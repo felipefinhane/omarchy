@@ -32,8 +32,22 @@ fi
 # of saving the already-dark 0.
 state_file="${XDG_RUNTIME_DIR:-/tmp}/omarchy-brightness-keyboard-restore"
 
+# The last level picked with the keys below. Some keyboards come back from
+# suspend dark (T2 MacBooks re-enumerate theirs), and a lock taken right before
+# sleeping blanks only after resume, so the blank finds 0 where the user had a
+# lit level. A dark backlight is then saved as this level, 0 included when the
+# user picked it.
+level_file="${XDG_RUNTIME_DIR:-/tmp}/omarchy-brightness-keyboard-level"
+
 if [[ $direction == "off" ]]; then
-  [[ -f $state_file ]] || brightnessctl -d "$device" get >"$state_file"
+  if [[ ! -f $state_file ]]; then
+    current_brightness="$(brightnessctl -d "$device" get)"
+    if (( current_brightness == 0 )) && [[ -f $level_file ]]; then
+      cp "$level_file" "$state_file"
+    else
+      echo "$current_brightness" >"$state_file"
+    fi
+  fi
   brightnessctl -d "$device" set 0 >/dev/null
   exit 0
 elif [[ $direction == "restore" ]]; then
@@ -67,4 +81,5 @@ fi
 
 # Set the new brightness.
 brightnessctl -d "$device" set "$new_brightness" >/dev/null
+echo "$new_brightness" >"$level_file"
 (( no_osd )) || omarchy-osd -i keyboard -p "$(( new_brightness * 100 / max_brightness ))"
